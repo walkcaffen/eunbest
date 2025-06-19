@@ -2,16 +2,88 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>은준 베스트 (은베)</title>
+  <style>
+    body {
+      font-family: '맑은 고딕', Arial, sans-serif;
+      max-width: 700px;
+      margin: 30px auto;
+      padding: 0 20px;
+    }
+    header {
+      margin-bottom: 20px;
+    }
+    #login-btn, #logout-btn {
+      cursor: pointer;
+      background-color: #e74c3c;
+      border: none;
+      color: white;
+      padding: 8px 15px;
+      font-size: 14px;
+      border-radius: 5px;
+      margin-left: 10px;
+    }
+    #post-form {
+      margin-bottom: 30px;
+      display: none;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 8px 10px;
+      margin: 5px 0 15px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+    button[type="submit"] {
+      background-color: #e74c3c;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-weight: bold;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+    ul#posts-list {
+      list-style: none;
+      padding: 0;
+    }
+    ul#posts-list li {
+      border-bottom: 1px solid #ddd;
+      padding: 12px 0;
+    }
+    #disqus_thread {
+      margin-top: 40px;
+    }
+  </style>
 </head>
 <body>
   <h1>🔥 은준 베스트 (은베)</h1>
-  <p>'홍은준'을 소재로 한 패러디 커뮤니티입니다.</p>
+  <p>'홍은준'을 소재로 한 커뮤니티.</p>
   <p>예아 🎉</p>
-<!-- 댓글 영역 -->
-<div id="disqus_thread"></div>
-<script>
+
+  <header>
+    <span id="user-info">로그인해라 이기야.</span>
+    <button id="login-btn" onclick="login()">Google 로그인</button>
+    <button id="logout-btn" onclick="logout()" style="display:none;">로그아웃</button>
+  </header>
+
+  <section>
+    <form id="post-form">
+      <input id="post-title" type="text" placeholder="제목 써라" maxlength="100" />
+      <textarea id="post-content" rows="5" placeholder="내용을 입력하세요" maxlength="1000"></textarea>
+      <button type="submit">글 작성</button>
+    </form>
+
+    <ul id="posts-list"></ul>
+  </section>
+
+  <!-- Disqus 댓글 영역 -->
+  <div id="disqus_thread"></div>
+
+  <script>
     var disqus_config = function () {
         this.page.url = window.location.href;
         this.page.identifier = window.location.pathname;
@@ -23,7 +95,116 @@
         s.setAttribute('data-timestamp', +new Date());
         (d.head || d.body).appendChild(s);
     })();
-</script>
-<noscript>댓글을 보려면 자바스크립트를 활성화하세요.</noscript>
+  </script>
+  <noscript>댓글을 보려면 자바스크립트를 활성화하세요.</noscript>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-app.js";
+    import {
+      getAuth,
+      GoogleAuthProvider,
+      signInWithPopup,
+      signOut,
+      onAuthStateChanged,
+    } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-auth.js";
+    import {
+      getFirestore,
+      collection,
+      addDoc,
+      query,
+      orderBy,
+      onSnapshot,
+      serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.6.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCJ9E1BODpC_m0UuWV25WM2i2_BrYn9Jbo",
+      authDomain: "eunbest-3f128.firebaseapp.com",
+      projectId: "eunbest-3f128",
+      storageBucket: "eunbest-3f128.firebasestorage.app",
+      messagingSenderId: "133791996056",
+      appId: "1:133791996056:web:e72f8e8f1be2dd83ea58ed"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const loginBtn = document.getElementById("login-btn");
+    const logoutBtn = document.getElementById("logout-btn");
+    const userInfo = document.getElementById("user-info");
+    const postForm = document.getElementById("post-form");
+    const postTitleInput = document.getElementById("post-title");
+    const postContentInput = document.getElementById("post-content");
+    const postsList = document.getElementById("posts-list");
+
+    async function login() {
+      const provider = new GoogleAuthProvider();
+      try {
+        await signInWithPopup(auth, provider);
+      } catch (error) {
+        alert("로그인 실패: " + error.message);
+      }
+    }
+
+    async function logout() {
+      await signOut(auth);
+    }
+
+    onAuthStateChanged(auth, user => {
+      if (user) {
+        userInfo.textContent = `반갑노! ${user.displayName}!`;
+        loginBtn.style.display = "none";
+        logoutBtn.style.display = "inline-block";
+        postForm.style.display = "block";
+      } else {
+        userInfo.textContent = "로그인헤리 게이야.";
+        loginBtn.style.display = "inline-block";
+        logoutBtn.style.display = "none";
+        postForm.style.display = "none";
+      }
+    });
+
+    postForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const title = postTitleInput.value.trim();
+      const content = postContentInput.value.trim();
+
+      if (!title || !content) {
+        alert("제목과 내용을 모두 입력해주세요.");
+        return;
+      }
+
+      try {
+        await addDoc(collection(db, "posts"), {
+          title,
+          content,
+          author: auth.currentUser.displayName,
+          createdAt: serverTimestamp(),
+        });
+        postTitleInput.value = "";
+        postContentInput.value = "";
+      } catch (error) {
+        alert("글 작성 실패: " + error.message);
+      }
+    });
+
+    const postsQuery = query(collection(db, "posts"), orderBy("createdAt", "desc"));
+    onSnapshot(postsQuery, (snapshot) => {
+      postsList.innerHTML = "";
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const li = document.createElement("li");
+        const date = data.createdAt?.toDate?.() || new Date();
+        li.innerHTML = `
+          <strong>${data.title}</strong><br/>
+          작성자: ${data.author}<br/>
+          ${data.content}<br/>
+          <small>${date.toLocaleString()}</small>
+        `;
+        postsList.appendChild(li);
+      });
+    });
+  </script>
 </body>
 </html>
